@@ -1,52 +1,97 @@
 -- 05_descriptive.sql
--- Descriptive statistics.
+-- Description of the analysis sample by CRC status ("Table 1").
+-- Requires: 04_analysis_table.sql
+-- Analysis sample: in_analysis = 1 (6510 patients: 226 with CRC, 6284 without CRC).
 
 -------------------------------------------------------------
--- PATIENTS (all patients, to be repeated for the study population)
+-- Numbers of patients and age
 -------------------------------------------------------------
+SELECT has_crc,
+       COUNT(*)                    AS n,
+       ROUND(AVG(age_at_index), 1) AS mean_age,
+       MEDIAN(age_at_index)        AS median_age,
+       MIN(age_at_index)           AS min_age,
+       MAX(age_at_index)           AS max_age
+FROM analysis_table
+WHERE in_analysis = 1
+GROUP BY has_crc
+ORDER BY has_crc;
+
+-------------------------------------------------------------
+-- Categorical variables: n and % within each CRC group
+-------------------------------------------------------------
+-- The denominator is the number of patients in the CRC group (has_crc = 0 or 1),
+-- calculated with a window function: SUM(COUNT(*)) OVER (PARTITION BY has_crc).
 
 -- Sex
-SELECT GENDER,
+SELECT has_crc,
+       GENDER,
        COUNT(*) AS n,
-       ROUND(100.0 * COUNT(*) / (SELECT COUNT(*) FROM patients), 1) AS pct
-FROM patients
-GROUP BY GENDER
-ORDER BY n DESC;
+       ROUND(100.0 * COUNT(*) / SUM(COUNT(*)) OVER (PARTITION BY has_crc), 1) AS pct
+FROM analysis_table
+WHERE in_analysis = 1
+GROUP BY has_crc, GENDER
+ORDER BY has_crc, GENDER;
+
+-- Age group
+SELECT has_crc,
+       age_group,
+       COUNT(*) AS n,
+       ROUND(100.0 * COUNT(*) / SUM(COUNT(*)) OVER (PARTITION BY has_crc), 1) AS pct
+FROM analysis_table
+WHERE in_analysis = 1
+GROUP BY has_crc, age_group
+ORDER BY has_crc, age_group;
 
 -- Race
-SELECT RACE,
+SELECT has_crc,
+       RACE,
        COUNT(*) AS n,
-       ROUND(100.0 * COUNT(*) / (SELECT COUNT(*) FROM patients), 1) AS pct
-FROM patients
-GROUP BY RACE
-ORDER BY n DESC;
+       ROUND(100.0 * COUNT(*) / SUM(COUNT(*)) OVER (PARTITION BY has_crc), 1) AS pct
+FROM analysis_table
+WHERE in_analysis = 1
+GROUP BY has_crc, RACE
+ORDER BY has_crc, n DESC;
 
--- Ethnicity
-SELECT ETHNICITY,
+-- Smoking
+SELECT has_crc,
+       smoking,
        COUNT(*) AS n,
-       ROUND(100.0 * COUNT(*) / (SELECT COUNT(*) FROM patients), 1) AS pct
-FROM patients
-GROUP BY ETHNICITY
-ORDER BY n DESC;
+       ROUND(100.0 * COUNT(*) / SUM(COUNT(*)) OVER (PARTITION BY has_crc), 1) AS pct
+FROM analysis_table
+WHERE in_analysis = 1
+GROUP BY has_crc, smoking
+ORDER BY has_crc, smoking;
 
--- Age: min, max, mean, median
-WITH patient_age AS (
-    SELECT Id,
-           CASE
-               WHEN DEATHDATE IS NOT NULL THEN date_sub('year', BIRTHDATE, DEATHDATE)
-               ELSE date_sub('year', BIRTHDATE, DATE '2026-11-19')
-           END AS age
-    FROM patients
-)
-SELECT MIN(age)           AS min_age,
-       MAX(age)           AS max_age,
-       ROUND(AVG(age), 1) AS mean_age,
-       MEDIAN(age)        AS median_age
-FROM patient_age;
+-- BMI category
+SELECT has_crc,
+       bmi_category,
+       COUNT(*) AS n,
+       ROUND(100.0 * COUNT(*) / SUM(COUNT(*)) OVER (PARTITION BY has_crc), 1) AS pct
+FROM analysis_table
+WHERE in_analysis = 1
+GROUP BY has_crc, bmi_category
+ORDER BY has_crc, bmi_category;
 
--- Income (median is preferred: the distribution is skewed)
-SELECT MIN(INCOME)           AS min_income,
-       MAX(INCOME)           AS max_income,
-       ROUND(AVG(INCOME), 0) AS mean_income,
+-- Type 2 diabetes
+SELECT has_crc,
+       has_diabetes,
+       COUNT(*) AS n,
+       ROUND(100.0 * COUNT(*) / SUM(COUNT(*)) OVER (PARTITION BY has_crc), 1) AS pct
+FROM analysis_table
+WHERE in_analysis = 1
+GROUP BY has_crc, has_diabetes
+ORDER BY has_crc, has_diabetes;
+
+-------------------------------------------------------------
+-- Continuous variables: BMI and income
+-------------------------------------------------------------
+-- Median is shown for income because the distribution is skewed.
+SELECT has_crc,
+       ROUND(AVG(bmi), 1)    AS mean_bmi,
+       ROUND(MEDIAN(bmi), 1) AS median_bmi,
        MEDIAN(INCOME)        AS median_income
-FROM patients;
+FROM analysis_table
+WHERE in_analysis = 1
+GROUP BY has_crc
+ORDER BY has_crc;
